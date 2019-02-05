@@ -9,16 +9,7 @@ from collections import defaultdict
 ###TODO: change dirs
 train_data_path = "./data/train.json"
 table_data_path = "./data/tables.json"
-if train_dev == "dev":
-    train_data_path = "./data/dev.json"
-
-train_dev = "train"
-if len(sys.argv) > 1:
-    train_dev = sys.argv[1]
-train_data = json.load(open(train_data_path))
 history_option = "full"
-if len(sys.argv) > 2:
-    history_option = sys.argv[2]
 
 OLD_WHERE_OPS = ('not', 'between', '=', '>', '<', '>=', '<=', '!=', 'in', 'like', 'is', 'exists')
 NEW_WHERE_OPS = ('=','>','<','>=','<=','!=','like','not in','in','between','is')
@@ -659,4 +650,11 @@ def parse_data(data):
 
 
 if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        train_dev = sys.argv[1]
+        if train_dev == "dev":
+            train_data_path = "./data/dev.json"
+    if len(sys.argv) > 2:
+        history_option = sys.argv[2]
+    train_data = json.load(open(train_data_path))
     parse_data(train_data)
