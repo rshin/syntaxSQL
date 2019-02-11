@@ -2,13 +2,14 @@
 python3 preprocess_train_dev_data.py train|dev (full|part)
 '''
 
+import argparse
 import json
 import sys
+import os
 from collections import defaultdict
+import tqdm
 
 ###TODO: change dirs
-train_data_path = "./data/train.json"
-table_data_path = "./data/tables.json"
 history_option = "full"
 
 OLD_WHERE_OPS = ('not', 'between', '=', '>', '<', '>=', '<=', '!=', 'in', 'like', 'is', 'exists')
@@ -616,15 +617,16 @@ def parser_item(question_tokens, sql, table, history, dataset):
         })
 
 
-def get_table_dict(table_data_path):
-    data = json.load(open(table_data_path))
+def get_table_dict(table_data_paths):
     table = dict()
-    for item in data:
-        table[item["db_id"]] = item
+    for path in table_data_paths:
+        data = json.load(open(path))
+        for item in data:
+            table[item["db_id"]] = item
     return table
 
 
-def parse_data(data):
+def parse_data(data, table_dict, outdir, train_dev):
     dataset = {
         "multi_sql_dataset": [],
         "keyword_dataset": [],
@@ -636,25 +638,30 @@ def parse_data(data):
         "having_dataset": [],
         "andor_dataset":[]
     }
-    table_dict = get_table_dict(table_data_path)
-    for item in data:
+    for item in tqdm.tqdm(data):
         if history_option == "full":
         # parser_item(item["question_toks"], item["sql"], table_dict[item["db_id"]], [], dataset)
             parser_item_with_long_history(item["question_toks"], item["sql"], table_dict[item["db_id"]], [], dataset)
         else:
             parser_item(item["question_toks"], item["sql"], table_dict[item["db_id"]], [], dataset)
     print("finished preprocess")
+    if not os.path.exists(outdir):
+        os.makedirs(outdir)
     for key in dataset:
         print("dataset:{} size:{}".format(key, len(dataset[key])))
-        json.dump(dataset[key], open("./generated_data/{}_{}_{}.json".format(history_option,train_dev, key), "w"), indent=2)
+        json.dump(dataset[key], open("{}/{}_{}_{}.json".format(outdir, history_option,train_dev, key), "w"), indent=2)
 
 
 if __name__ == '__main__':
-    if len(sys.argv) > 1:
-        train_dev = sys.argv[1]
-        if train_dev == "dev":
-            train_data_path = "./data/dev.json"
-    if len(sys.argv) > 2:
-        history_option = sys.argv[2]
-    train_data = json.load(open(train_data_path))
-    parse_data(train_data)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--tables', nargs='+')
+    parser.add_argument('--inputs', nargs='+')
+    parser.add_argument('--section', required=True)
+    parser.add_argument('--out', required=True)
+    args = parser.parse_args()
+
+    train_data = []
+    for inp in args.inputs:
+      train_data += json.load(open(inp))
+    table_dict = get_table_dict(args.tables)
+    parse_data(train_data, table_dict, args.out, args.section)
