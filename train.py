@@ -15,7 +15,7 @@ from models.op_predictor import OpPredictor
 from models.root_teminal_predictor import RootTeminalPredictor
 from models.andor_predictor import AndOrPredictor
 
-from models import baseline_encoder
+from models import baseline_encoder, seq2struct_encoder
 
 TRAIN_COMPONENTS = ('multi_sql','keyword','col','op','agg','root_tem','des_asc','having','andor')
 SQL_TOK = ['<UNK>', '<END>', 'WHERE', 'AND', 'EQL', 'GT', 'LT', '<BEG>']
@@ -88,6 +88,68 @@ if __name__ == '__main__':
     if args.query_encoder == 'baseline':
         encoder = baseline_encoder.BaselineEncoder(
             N_word, N_h, N_depth, embed_layer, should_encode_cols[args.train_component])
+    elif args.query_encoder.startswith('seq2struct'):
+        spider_enc_configs = {
+            'qenc=eb,ctenc=ebs,upd_steps=2': {
+                'dropout': 0.2,
+                'question_encoder': ('bilstm',),
+                'column_encoder': ('bilstm-summarize',),
+                'table_encoder': ('bilstm-summarize',),
+                'update_config': {
+                    'name': 'relational_transformer',
+                    'num_layers': 2,
+                    'num_heads': 8,
+                },
+            },
+            'qenc=eb,ctenc=ebs,upd_steps=3': {
+                'dropout': 0.2,
+                'question_encoder': ('bilstm',),
+                'column_encoder': ('bilstm-summarize',),
+                'table_encoder': ('bilstm-summarize',),
+                'update_config': {
+                    'name': 'relational_transformer',
+                    'num_layers': 3,
+                    'num_heads': 8,
+                },
+            },
+            'qenc=eb,ctenc=ebs,upd_steps=4': {
+                'dropout': 0.2,
+                'question_encoder': ('bilstm',),
+                'column_encoder': ('bilstm-summarize',),
+                'table_encoder': ('bilstm-summarize',),
+                'update_config': {
+                    'name': 'relational_transformer',
+                    'num_layers': 4,
+                    'num_heads': 8,
+                },
+            },
+            'qenc=eb,ctenc=ebs,upd_steps=5': {
+                'dropout': 0.2,
+                'question_encoder': ('bilstm',),
+                'column_encoder': ('bilstm-summarize',),
+                'table_encoder': ('bilstm-summarize',),
+                'update_config': {
+                    'name': 'relational_transformer',
+                    'num_layers': 5,
+                    'num_heads': 8,
+                },
+            },
+            'qenc=eb,ctenc=ebs,upd_steps=6': {
+                'dropout': 0.2,
+                'question_encoder': ('bilstm',),
+                'column_encoder': ('bilstm-summarize',),
+                'table_encoder': ('bilstm-summarize',),
+                'update_config': {
+                    'name': 'relational_transformer',
+                    'num_layers': 6,
+                    'num_heads': 8,
+                },
+            },
+        }
+        spider_enc_config = spider_enc_configs[args.query_encoder.split(':', 1)[1]]
+
+        encoder = seq2struct_encoder.Seq2structEncoder(
+            N_word, N_h, N_depth, embed_layer, should_encode_cols[args.train_component], spider_enc_config, GPU)
     else:
         raise ValueError(args.query_encoder)
     if args.train_component == "multi_sql":

@@ -3,6 +3,7 @@ python3 preprocess_train_dev_data.py train|dev (full|part)
 '''
 
 import argparse
+import collections
 import json
 import sys
 import os
@@ -247,12 +248,57 @@ class AndOrPredictor:
         return self.history,-1
 
 
-def parser_item_with_long_history(question_tokens, sql, table, history, dataset):
+def to_dict_with_sorted_values(d, key=None):
+    return {k: sorted(v, key=key) for k, v in d.items()}
+
+
+def create_ts(table):
+    column_to_table = {}
+    table_to_columns = {str(i): [] for i in range(len(table["table_names"]))}
+    foreign_keys = {}
+    foreign_keys_tables = collections.defaultdict(set)
+
+    for i, ((table_id, column_name), column_type) in enumerate(zip(table["column_names"], table["column_types"])):
+        column_to_table[str(i)] = table_id
+        if table_id != -1:
+            table_to_columns[str(table_id)].append(i)
+
+    for source_column_id, dest_column_id in table["foreign_keys"]:
+        foreign_keys[source_column_id] = dest_column_id
+        foreign_keys_tables[str(column_to_table[str(source_column_id)])].add(
+                column_to_table[str(dest_column_id)])
+    foreign_keys_tables = to_dict_with_sorted_values(foreign_keys_tables)
+
     table_schema = [
         table["table_names"],
         table["column_names"],
-        table["column_types"]
+        table["column_types"],
+        column_to_table,
+        table_to_columns,
+        foreign_keys,
+        foreign_keys_tables,
+        table["primary_keys"],
     ]
+
+    return table_schema
+
+    # x 'question': item.text,
+    # x 'columns': column_names,
+    # x 'tables': table_names,
+    # not needed 'table_bounds': table_bounds,
+    # x 'column_to_table': column_to_table,
+    # x 'table_to_columns': table_to_columns,
+    # x 'foreign_keys': foreign_keys,
+    # x 'foreign_keys_tables': serialization.to_dict_with_sorted_values(foreign_keys_tables),
+    # x 'primary_keys': [
+    #     column.id
+    #     for column in table.primary_keys 
+    #     for table in item.schema.tables
+    # ],
+
+
+def parser_item_with_long_history(question_tokens, sql, table, history, dataset):
+    table_schema = create_ts(table)
     stack = [("root",sql)]
     with_join = False
     fk_dict = defaultdict(list)
@@ -486,11 +532,7 @@ def parser_item(question_tokens, sql, table, history, dataset):
     # except:
     #     print(item)
     # sql = item['sql']
-    table_schema = [
-        table["table_names"],
-        table["column_names"],
-        table["column_types"]
-    ]
+    table_schema = create_ts(table)
     history, label, sql = MultiSqlPredictor(question_tokens, sql, history).generate_output()
     dataset['multi_sql_dataset'].append({
         "question_tokens": question_tokens,
