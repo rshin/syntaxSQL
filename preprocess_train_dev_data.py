@@ -348,7 +348,7 @@ def parser_item_with_long_history(question_tokens, sql, table, history, dataset)
                     "label":get_label_cols(with_join,fk_dict,l[1])
                 })
                 for col, sql_item in zip(l[1], s):
-                    key = "{}{}{}".format(col[0][0],col[0][1],col[0][2])
+                    key = u"{}{}{}".format(col[0][0],col[0][1],col[0][2])
                     if key not in agg_col_dict:
                         agg_col_dict[key] = [(sql_item,col[0])]
                     else:
@@ -448,7 +448,7 @@ def parser_item_with_long_history(question_tokens, sql, table, history, dataset)
                     "label": get_label_cols(with_join,fk_dict,l[1])
                 })
                 for col, sql_item in zip(l[1], s):
-                    key = "{}{}{}".format(col[0][0], col[0][1], col[0][2])
+                    key = u"{}{}{}".format(col[0][0], col[0][1], col[0][2])
                     if key not in op_col_dict:
                         op_col_dict[key] = [(sql_item, col[0])]
                     else:
@@ -470,7 +470,7 @@ def parser_item_with_long_history(question_tokens, sql, table, history, dataset)
                     "label": get_label_cols(with_join,fk_dict,l[1])
                 })
                 for col, sql_item in zip(l[1], s):
-                    key = "{}{}{}".format(col[0][0], col[0][1], col[0][2])
+                    key = u"{}{}{}".format(col[0][0], col[0][1], col[0][2])
                     if key not in agg_col_dict:
                         agg_col_dict[key] = [(sql_item, col[0])]
                     else:
@@ -561,7 +561,7 @@ def parser_item(question_tokens, sql, table, history, dataset):
         _, label, s = OpPredictor(question_tokens, sql_item, h).generate_output()
         if label == -1:
             continue
-        key = "{}{}".format(h[-2], h[-1][2])
+        key = u"{}{}".format(h[-2], h[-1][2])
         label = NEW_WHERE_OPS[label]
         if key in op_col_dict:
             op_col_dict[key][1].append(label)
@@ -601,7 +601,7 @@ def parser_item(question_tokens, sql, table, history, dataset):
     for h, sql_item in agg_candidates:
         _, label = AggPredictor(question_tokens, sql_item, h).generate_output()
         if label != 5:
-            key = "{}{}".format(h[-2], h[-1][2])
+            key = u"{}{}".format(h[-2], h[-1][2])
             if key in agg_col_dict:
                 agg_col_dict[key][1].append(label)
             else:
@@ -618,6 +618,8 @@ def parser_item(question_tokens, sql, table, history, dataset):
 
 
 def get_table_dict(table_data_paths):
+    if not isinstance(table_data_paths, (list, tuple)):
+        table_data_paths = [table_data_paths]
     table = dict()
     for path in table_data_paths:
         data = json.load(open(path))
