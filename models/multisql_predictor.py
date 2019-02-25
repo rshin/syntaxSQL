@@ -55,7 +55,7 @@ class MultiSqlPredictor(nn.Module):
         # mkw: (B, 4, hid_dim)
         q_enc = enc.q_enc
         hs_enc, _ = run_lstm(self.hs_lstm, hs_emb_var, hs_len)
-        mkw_enc, _ = run_lstm(self.mkw_lstm, mkw_emb_var, np.full(q_len.shape, kw_emb_var.shape[1], dtype=np.int64))
+        mkw_enc, _ = run_lstm(self.mkw_lstm, mkw_emb_var, np.full(q_len.shape, mkw_emb_var.shape[1], dtype=np.int64))
 
         # Compute attention values between multi SQL key words and question tokens.
         # qmkw_att(q_enc).transpose(1, 2): (B, hid_dim, max_q_len)

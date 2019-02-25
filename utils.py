@@ -95,7 +95,7 @@ def compute_score(model, component, embed_layer, data, table_type, perm, st, ed)
         score = model.forward(encoder_info, hs_emb_var, hs_len, gt_col=gt_col)
 
     elif component == "andor":
-        score = model.forward(encoder_info, q_len, hs_emb_var, hs_len)
+        score = model.forward(encoder_info, hs_emb_var, hs_len)
     
     return score, label
 
@@ -117,7 +117,7 @@ def epoch_train(model, optimizer, batch_size, component,embed_layer,data, table_
         # print("label {}".format(label))
         loss = model.loss(score, label)
         # print("loss {}".format(loss.data.cpu().numpy()))
-        cum_loss += loss.data.cpu().numpy()[0]*(ed - st)
+        cum_loss += loss.data.cpu().numpy()*(ed - st)
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()

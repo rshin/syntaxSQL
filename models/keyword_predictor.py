@@ -48,7 +48,7 @@ class KeyWordPredictor(nn.Module):
         if gpu:
             self.cuda()
 
-    def forward(self, encoder_info, hs_emb_var, hs_len, kw_emb_var, kw_len):
+    def forward(self, encoder_info, hs_emb_var, hs_len, kw_emb_var):
         enc = self.encoder(*encoder_info)
         q_len = enc.q_len
         max_q_len = max(q_len)
