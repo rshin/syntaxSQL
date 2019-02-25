@@ -4,27 +4,25 @@ import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-from net_utils import run_lstm, col_name_encode
+from .net_utils import run_lstm, col_name_encode
 
 
 class KeyWordPredictor(nn.Module):
     '''Predict if the next token is (SQL key words):
         WHERE, GROUP BY, ORDER BY. excluding SELECT (it is a must)'''
-    def __init__(self, N_word, N_h, N_depth, gpu, use_hs):
+    def __init__(self, encoder, N_word, N_h, N_depth, gpu, use_hs):
         super(KeyWordPredictor, self).__init__()
         self.N_h = N_h
         self.gpu = gpu
         self.use_hs = use_hs
 
-        self.q_lstm = nn.LSTM(input_size=N_word, hidden_size=N_h/2,
+        self.encoder = encoder
+
+        self.hs_lstm = nn.LSTM(input_size=N_word, hidden_size=N_h//2,
                 num_layers=N_depth, batch_first=True,
                 dropout=0.3, bidirectional=True)
 
-        self.hs_lstm = nn.LSTM(input_size=N_word, hidden_size=N_h/2,
-                num_layers=N_depth, batch_first=True,
-                dropout=0.3, bidirectional=True)
-
-        self.kw_lstm = nn.LSTM(input_size=N_word, hidden_size=N_h/2,
+        self.kw_lstm = nn.LSTM(input_size=N_word, hidden_size=N_h//2,
                 num_layers=N_depth, batch_first=True,
                 dropout=0.3, bidirectional=True)
 
@@ -50,14 +48,16 @@ class KeyWordPredictor(nn.Module):
         if gpu:
             self.cuda()
 
-    def forward(self, q_emb_var, q_len, hs_emb_var, hs_len, kw_emb_var, kw_len):
+    def forward(self, encoder_info, hs_emb_var, hs_len, kw_emb_var, kw_len):
+        enc = self.encoder(*encoder_info)
+        q_len = enc.q_len
         max_q_len = max(q_len)
         max_hs_len = max(hs_len)
         B = len(q_len)
 
-        q_enc, _ = run_lstm(self.q_lstm, q_emb_var, q_len)
+        q_enc = enc.q_enc
         hs_enc, _ = run_lstm(self.hs_lstm, hs_emb_var, hs_len)
-        kw_enc, _ = run_lstm(self.kw_lstm, kw_emb_var, kw_len)
+        kw_enc, _ = run_lstm(self.kw_lstm, kw_emb_var, np.full(q_len.shape, kw_emb_var.shape[1], dtype=np.int64))
 
         # Predict key words number: 0-3
         att_val_qkw_num = torch.bmm(kw_enc, self.q_num_att(q_enc).transpose(1, 2))

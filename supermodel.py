@@ -423,7 +423,7 @@ class SuperModel(nn.Module):
         ret = []
         for i in range(0,len(sql),2):
             # if len(sql[i+1]) == 0:
-            if sql[i+1] == "none_agg" or not isinstance(sql[i+1],basestring): #DEBUG-ed 20180817
+            if sql[i+1] == "none_agg" or not isinstance(sql[i+1],str): #DEBUG-ed 20180817
                 ret.append(self.gen_col(sql[i],table,table_alias_dict))
             else:
                 ret.append("{}({})".format(sql[i+1], self.gen_col(sql[i], table, table_alias_dict)))
@@ -436,7 +436,7 @@ class SuperModel(nn.Module):
             return ""
         start_idx = 0
         andor = "and"
-        if isinstance(sql[0],basestring):
+        if isinstance(sql[0],str):
             start_idx += 1
             andor = sql[0]
         ret = []
@@ -462,7 +462,7 @@ class SuperModel(nn.Module):
         if sql[-1] == True:
             limit = "limit 1"
         for i in range(0,len(sql),4):
-            if sql[i+1] == "none_agg" or not isinstance(sql[i+1],basestring): #DEBUG-ed 20180817
+            if sql[i+1] == "none_agg" or not isinstance(sql[i+1],str): #DEBUG-ed 20180817
                 ret.append("{} {}".format(self.gen_col(sql[i],table,table_alias_dict), sql[i+2]))
             else:
                 ret.append("{}({}) {}".format(sql[i+1], self.gen_col(sql[i], table, table_alias_dict),sql[i+2]))

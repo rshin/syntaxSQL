@@ -15,6 +15,8 @@ from models.op_predictor import OpPredictor
 from models.root_teminal_predictor import RootTeminalPredictor
 from models.andor_predictor import AndOrPredictor
 
+from models import baseline_encoder
+
 TRAIN_COMPONENTS = ('multi_sql','keyword','col','op','agg','root_tem','des_asc','having','andor')
 SQL_TOK = ['<UNK>', '<END>', 'WHERE', 'AND', 'EQL', 'GT', 'LT', '<BEG>']
 if __name__ == '__main__':
@@ -33,6 +35,7 @@ if __name__ == '__main__':
                         help='number of epoch for training')
     parser.add_argument('--history_type', type=str, default='full', choices=['full','part','no'], help='full, part, or no history')
     parser.add_argument('--table_type', type=str, default='std', choices=['std','no'], help='standard, hierarchical, or no table info')
+    parser.add_argument('--query_encoder', type=str, default='baseline')
     args = parser.parse_args()
     use_hs = True
     if args.history_type == "no":
@@ -67,33 +70,49 @@ if __name__ == '__main__':
     word_emb = load_word_emb('glove/glove.%dB.%dd.txt'%(B_word,N_word), \
             load_used=args.train_emb, use_small=USE_SMALL)
     print("finished load word embedding")
+    embed_layer = WordEmbedding(word_emb, N_word, gpu=GPU,
+                                SQL_TOK=SQL_TOK, trainable=args.train_emb)
     #word_emb = load_concat_wemb('glove/glove.42B.300d.txt', "/data/projects/paraphrase/generation/para-nmt-50m/data/paragram_sl999_czeng.txt")
     model = None
+    should_encode_cols = {
+        'multi_sql': False,
+        'keyword': False,
+        'col': True,
+        'op': True,
+        'agg': True,
+        'root_tem': True,
+        'des_asc': True,
+        'having': True,
+        'andor': False,
+    }
+    if args.query_encoder == 'baseline':
+        encoder = baseline_encoder.BaselineEncoder(
+            N_word, N_h, N_depth, embed_layer, should_encode_cols[args.train_component])
+    else:
+        raise ValueError(args.query_encoder)
     if args.train_component == "multi_sql":
-        model = MultiSqlPredictor(N_word=N_word,N_h=N_h,N_depth=N_depth,gpu=GPU, use_hs=use_hs)
+        model = MultiSqlPredictor(encoder=encoder, N_word=N_word,N_h=N_h,N_depth=N_depth,gpu=GPU, use_hs=use_hs)
     elif args.train_component == "keyword":
-        model = KeyWordPredictor(N_word=N_word,N_h=N_h,N_depth=N_depth,gpu=GPU, use_hs=use_hs)
+        model = KeyWordPredictor(encoder=encoder, N_word=N_word,N_h=N_h,N_depth=N_depth,gpu=GPU, use_hs=use_hs)
     elif args.train_component == "col":
-        model = ColPredictor(N_word=N_word,N_h=N_h,N_depth=N_depth,gpu=GPU, use_hs=use_hs)
+        model = ColPredictor(encoder=encoder, N_word=N_word,N_h=N_h,N_depth=N_depth,gpu=GPU, use_hs=use_hs)
     elif args.train_component == "op":
-        model = OpPredictor(N_word=N_word,N_h=N_h,N_depth=N_depth,gpu=GPU, use_hs=use_hs)
+        model = OpPredictor(encoder=encoder, N_word=N_word,N_h=N_h,N_depth=N_depth,gpu=GPU, use_hs=use_hs)
     elif args.train_component == "agg":
-        model = AggPredictor(N_word=N_word,N_h=N_h,N_depth=N_depth,gpu=GPU, use_hs=use_hs)
+        model = AggPredictor(encoder=encoder, N_word=N_word,N_h=N_h,N_depth=N_depth,gpu=GPU, use_hs=use_hs)
     elif args.train_component == "root_tem":
-        model = RootTeminalPredictor(N_word=N_word,N_h=N_h,N_depth=N_depth,gpu=GPU, use_hs=use_hs)
+        model = RootTeminalPredictor(encoder=encoder, N_word=N_word,N_h=N_h,N_depth=N_depth,gpu=GPU, use_hs=use_hs)
     elif args.train_component == "des_asc":
-        model = DesAscLimitPredictor(N_word=N_word,N_h=N_h,N_depth=N_depth,gpu=GPU, use_hs=use_hs)
+        model = DesAscLimitPredictor(encoder=encoder, N_word=N_word,N_h=N_h,N_depth=N_depth,gpu=GPU, use_hs=use_hs)
     elif args.train_component == "having":
-        model = HavingPredictor(N_word=N_word,N_h=N_h,N_depth=N_depth,gpu=GPU, use_hs=use_hs)
+        model = HavingPredictor(encoder=encoder, N_word=N_word,N_h=N_h,N_depth=N_depth,gpu=GPU, use_hs=use_hs)
     elif args.train_component == "andor":
-        model = AndOrPredictor(N_word=N_word, N_h=N_h, N_depth=N_depth, gpu=GPU, use_hs=use_hs)
+        model = AndOrPredictor(encoder=encoder, N_word=N_word, N_h=N_h, N_depth=N_depth, gpu=GPU, use_hs=use_hs)
     # model = SQLNet(word_emb, N_word=N_word, gpu=GPU, trainable_emb=args.train_emb)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay = 0)
     print("finished build model")
 
     print_flag = False
-    embed_layer = WordEmbedding(word_emb, N_word, gpu=GPU,
-                                SQL_TOK=SQL_TOK, trainable=args.train_emb)
     print("start training")
     best_acc = 0.0
     for i in range(args.epoch):

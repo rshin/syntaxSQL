@@ -4,27 +4,24 @@ import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-from net_utils import run_lstm, col_name_encode
+from .net_utils import run_lstm, col_name_encode
 
 
 class MultiSqlPredictor(nn.Module):
     '''Predict if the next token is (multi SQL key words):
         NONE, EXCEPT, INTERSECT, or UNION.'''
-    def __init__(self, N_word, N_h, N_depth, gpu, use_hs):
+    def __init__(self, encoder, N_word, N_h, N_depth, gpu, use_hs):
         super(MultiSqlPredictor, self).__init__()
         self.N_h = N_h
         self.gpu = gpu
         self.use_hs = use_hs
 
-        self.q_lstm = nn.LSTM(input_size=N_word, hidden_size=N_h/2,
+        self.encoder = encoder
+        self.hs_lstm = nn.LSTM(input_size=N_word, hidden_size=N_h//2,
                 num_layers=N_depth, batch_first=True,
                 dropout=0.3, bidirectional=True)
 
-        self.hs_lstm = nn.LSTM(input_size=N_word, hidden_size=N_h/2,
-                num_layers=N_depth, batch_first=True,
-                dropout=0.3, bidirectional=True)
-
-        self.mkw_lstm = nn.LSTM(input_size=N_word, hidden_size=N_h/2,
+        self.mkw_lstm = nn.LSTM(input_size=N_word, hidden_size=N_h//2,
                 num_layers=N_depth, batch_first=True,
                 dropout=0.3, bidirectional=True)
 
@@ -45,8 +42,10 @@ class MultiSqlPredictor(nn.Module):
         if gpu:
             self.cuda()
 
-    def forward(self, q_emb_var, q_len, hs_emb_var, hs_len, mkw_emb_var, mkw_len):
+    def forward(self, encoder_info, hs_emb_var, hs_len, mkw_emb_var):
         # print("q_emb_shape:{} hs_emb_shape:{}".format(q_emb_var.size(), hs_emb_var.size()))
+        enc = self.encoder(*encoder_info)
+        q_len = enc.q_len
         max_q_len = max(q_len)
         max_hs_len = max(hs_len)
         B = len(q_len)
@@ -54,9 +53,9 @@ class MultiSqlPredictor(nn.Module):
         # q_enc: (B, max_q_len, hid_dim)
         # hs_enc: (B, max_hs_len, hid_dim)
         # mkw: (B, 4, hid_dim)
-        q_enc, _ = run_lstm(self.q_lstm, q_emb_var, q_len)
+        q_enc = enc.q_enc
         hs_enc, _ = run_lstm(self.hs_lstm, hs_emb_var, hs_len)
-        mkw_enc, _ = run_lstm(self.mkw_lstm, mkw_emb_var, mkw_len)
+        mkw_enc, _ = run_lstm(self.mkw_lstm, mkw_emb_var, np.full(q_len.shape, kw_emb_var.shape[1], dtype=np.int64))
 
         # Compute attention values between multi SQL key words and question tokens.
         # qmkw_att(q_enc).transpose(1, 2): (B, hid_dim, max_q_len)

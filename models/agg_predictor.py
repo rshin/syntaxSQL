@@ -4,25 +4,19 @@ import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-from net_utils import run_lstm, col_name_encode
+from .net_utils import run_lstm, col_name_encode
 
 
 class AggPredictor(nn.Module):
-    def __init__(self, N_word, N_h, N_depth, gpu, use_hs):
+    def __init__(self, encoder, N_word, N_h, N_depth, gpu, use_hs):
         super(AggPredictor, self).__init__()
         self.N_h = N_h
         self.gpu = gpu
         self.use_hs = use_hs
 
-        self.q_lstm = nn.LSTM(input_size=N_word, hidden_size=N_h/2,
-                num_layers=N_depth, batch_first=True,
-                dropout=0.3, bidirectional=True)
+        self.encoder = encoder
 
-        self.hs_lstm = nn.LSTM(input_size=N_word, hidden_size=N_h/2,
-                num_layers=N_depth, batch_first=True,
-                dropout=0.3, bidirectional=True)
-
-        self.col_lstm = nn.LSTM(input_size=N_word, hidden_size=N_h/2,
+        self.hs_lstm = nn.LSTM(input_size=N_word, hidden_size=N_h//2,
                 num_layers=N_depth, batch_first=True,
                 dropout=0.3, bidirectional=True)
 
@@ -50,15 +44,20 @@ class AggPredictor(nn.Module):
             self.cuda()
 
 
-    def forward(self, q_emb_var, q_len, hs_emb_var, hs_len, col_emb_var, col_len, col_name_len, gt_col):
+#    def forward(self, q_emb_var, q_len, hs_emb_var, hs_len, col_emb_var, col_len, col_name_len, gt_col):
+    def forward(self, encoder_info, hs_emb_var, hs_len, gt_col):
+        enc = self.encoder(*encoder_info)
+        q_len = enc.q_len
+        col_len = enc.col_len
+
         max_q_len = max(q_len)
         max_hs_len = max(hs_len)
         max_col_len = max(col_len)
         B = len(q_len)
 
-        q_enc, _ = run_lstm(self.q_lstm, q_emb_var, q_len)
+        q_enc = enc.q_enc
         hs_enc, _ = run_lstm(self.hs_lstm, hs_emb_var, hs_len)
-        col_enc, _ = col_name_encode(col_emb_var, col_name_len, col_len, self.col_lstm)
+        col_enc = enc.col_enc
 
         col_emb = []
         for b in range(B):
