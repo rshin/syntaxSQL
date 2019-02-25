@@ -48,6 +48,58 @@ def to_batch_tables(data, idxes, st,ed, table_type):
 
     return col_seq
 
+
+gt_col_components = {"op", "agg", "root_tem", "des_asc", "having"}
+
+
+def compute_score(model, component, embed_layer, data, table_type, perm, st, ed):
+    B = ed - st
+    _, history,label = to_batch_seq(data, perm, st, ed)
+    hs_emb_var, hs_len = embed_layer.gen_x_history_batch(history)
+    encoder_info = (data, perm, st, ed, table_type)
+
+    if component in gt_col_components:
+        gt_col = np.zeros((B,), dtype=np.int64)
+        index = 0
+        for i in range(st, ed):
+            gt_col[index] = data[perm[i]]["gt_col"]
+            index += 1
+
+    if component == "multi_sql":
+        mkw_emb_var = embed_layer.gen_word_list_embedding(["none","except","intersect","union"],(ed-st))
+        # print("mkw_emb:{}".format(mkw_emb_var.size()))
+        score = model.forward(encoder_info, hs_emb_var, hs_len, mkw_emb_var=mkw_emb_var)
+    elif component == "keyword":
+        #where group by order by
+        # [[0,1,2]]
+        kw_emb_var = embed_layer.gen_word_list_embedding(["where", "group by", "order by"],(ed-st))
+        score = model.forward(encoder_info, hs_emb_var, hs_len, kw_emb_var=kw_emb_var)
+    elif component == "col":
+        #col word embedding
+        # [[0,1,3]]
+        score = model.forward(encoder_info, hs_emb_var, hs_len)
+
+    elif component == "op":
+        score = model.forward(encoder_info, hs_emb_var, hs_len, gt_col=gt_col)
+
+    elif component == "agg":
+        score = model.forward(encoder_info, hs_emb_var, hs_len, gt_col=gt_col)
+
+    elif component == "root_tem":
+        score = model.forward(encoder_info, hs_emb_var, hs_len, gt_col=gt_col)
+
+    elif component == "des_asc":
+        score = model.forward(encoder_info, hs_emb_var, hs_len, gt_col=gt_col)
+
+    elif component == 'having':
+        score = model.forward(encoder_info, hs_emb_var, hs_len, gt_col=gt_col)
+
+    elif component == "andor":
+        score = model.forward(encoder_info, q_len, hs_emb_var, hs_len)
+    
+    return score, label
+
+
 ## used for training in train.py
 def epoch_train(model, optimizer, batch_size, component,embed_layer,data, table_type):
     model.train()
@@ -55,57 +107,11 @@ def epoch_train(model, optimizer, batch_size, component,embed_layer,data, table_
     cum_loss = 0.0
     st = 0
 
-    gt_col_components = {"op", "agg", "root_tem", "des_asc", "having"}
-
     while st < len(data):
         ed = st+batch_size if st+batch_size < len(perm) else len(perm)
-        B = ed - st
-        _, history,label = to_batch_seq(data, perm, st, ed)
-        hs_emb_var, hs_len = embed_layer.gen_x_history_batch(history)
-        score = 0.0
-        loss = 0.0
-        encoder_info = (data, perm, st, ed, table_type)
 
-        if component in gt_col_components:
-            gt_col = np.zeros((B,), dtype=np.int64)
-            index = 0
-            for i in range(st, ed):
-                gt_col[index] = data[perm[i]]["gt_col"]
-                index += 1
+        score, label = compute_score(model, component, embed_layer, data, table_type, perm, st, ed)
 
-        if component == "multi_sql":
-            mkw_emb_var = embed_layer.gen_word_list_embedding(["none","except","intersect","union"],(ed-st))
-            mkw_len = np.full(q_len.shape, 4,dtype=np.int64)
-            # print("mkw_emb:{}".format(mkw_emb_var.size()))
-            score = model.forward(encoder_info, hs_emb_var, hs_len, mkw_emb_var=mkw_emb_var)
-        elif component == "keyword":
-            #where group by order by
-            # [[0,1,2]]
-            kw_emb_var = embed_layer.gen_word_list_embedding(["where", "group by", "order by"],(ed-st))
-            mkw_len = np.full(q_len.shape, 3, dtype=np.int64)
-            score = model.forward(encoder_info, hs_emb_var, hs_len, kw_emb_var=kw_emb_var)
-        elif component == "col":
-            #col word embedding
-            # [[0,1,3]]
-            score = model.forward(encoder_info, hs_emb_var, hs_len)
-
-        elif component == "op":
-            score = model.forward(encoder_info, hs_emb_var, hs_len, gt_col=gt_col)
-
-        elif component == "agg":
-            score = model.forward(encoder_info, hs_emb_var, hs_len, gt_col=gt_col)
-
-        elif component == "root_tem":
-            score = model.forward(encoder_info, hs_emb_var, hs_len, gt_col=gt_col)
-
-        elif component == "des_asc":
-            score = model.forward(encoder_info, hs_emb_var, hs_len, gt_col=gt_col)
-
-        elif component == 'having':
-            score = model.forward(encoder_info, hs_emb_var, hs_len, gt_col=gt_col)
-
-        elif component == "andor":
-            score = model.forward(encoder_info, q_len, hs_emb_var, hs_len)
         # score = model.forward(q_seq, col_seq, col_num, pred_entry,
         #         gt_where=gt_where_seq, gt_cond=gt_cond_seq, gt_sel=gt_sel_seq)
         # print("label {}".format(label))
@@ -132,99 +138,8 @@ def epoch_acc(model, batch_size, component, embed_layer,data, table_type, error_
     while st < len(data):
         ed = st+batch_size if st+batch_size < len(perm) else len(perm)
 
-        q_seq, history, label = to_batch_seq(data, perm, st, ed)
-        q_emb_var, q_len = embed_layer.gen_x_q_batch(q_seq)
-        hs_emb_var, hs_len = embed_layer.gen_x_history_batch(history)
-        score = 0.0
+        score, label = compute_score(model, component, embed_layer, data, table_type, perm, st, ed)
 
-        if component == "multi_sql":
-            #none, except, intersect,union
-            #truth B*index(0,1,2,3)
-            # print("hs_len:{}".format(hs_len))
-            # print("q_emb_shape:{} hs_emb_shape:{}".format(q_emb_var.size(), hs_emb_var.size()))
-            mkw_emb_var = embed_layer.gen_word_list_embedding(["none","except","intersect","union"],(ed-st))
-            mkw_len = np.full(q_len.shape, 4,dtype=np.int64)
-            # print("mkw_emb:{}".format(mkw_emb_var.size()))
-            score = model.forward(q_emb_var, q_len, hs_emb_var, hs_len, mkw_emb_var=mkw_emb_var, mkw_len=mkw_len)
-        elif component == "keyword":
-            #where group by order by
-            # [[0,1,2]]
-            kw_emb_var = embed_layer.gen_word_list_embedding(["where", "group by", "order by"],(ed-st))
-            mkw_len = np.full(q_len.shape, 3, dtype=np.int64)
-            score = model.forward(q_emb_var, q_len, hs_emb_var, hs_len, kw_emb_var=kw_emb_var, kw_len=mkw_len)
-        elif component == "col":
-            #col word embedding
-            # [[0,1,3]]
-            col_seq = to_batch_tables(data, perm, st, ed, table_type)
-            col_emb_var, col_name_len, col_len = embed_layer.gen_col_batch(col_seq)
-            score = model.forward(q_emb_var, q_len, hs_emb_var, hs_len, col_emb_var, col_len, col_name_len)
-        elif component == "op":
-            #B*index
-            col_seq = to_batch_tables(data, perm, st, ed, table_type)
-            col_emb_var, col_name_len, col_len = embed_layer.gen_col_batch(col_seq)
-            gt_col = np.zeros(q_len.shape,dtype=np.int64)
-            # print(ed)
-            index = 0
-            for i in range(st,ed):
-                # print(i)
-                gt_col[index] = data[perm[i]]["gt_col"]
-                index += 1
-            score = model.forward(q_emb_var, q_len, hs_emb_var, hs_len, col_emb_var, col_len, col_name_len, gt_col=gt_col)
-
-        elif component == "agg":
-            # [[0,1,3]]
-            col_seq = to_batch_tables(data, perm, st, ed, table_type)
-            col_emb_var, col_name_len, col_len = embed_layer.gen_col_batch(col_seq)
-            gt_col = np.zeros(q_len.shape, dtype=np.int64)
-            # print(ed)
-            index = 0
-            for i in range(st, ed):
-                # print(i)
-                gt_col[index] = data[perm[i]]["gt_col"]
-                index += 1
-
-            score = model.forward(q_emb_var, q_len, hs_emb_var, hs_len, col_emb_var, col_len, col_name_len, gt_col=gt_col)
-
-        elif component == "root_tem":
-            #B*0/1
-            col_seq = to_batch_tables(data, perm, st, ed, table_type)
-            col_emb_var, col_name_len, col_len = embed_layer.gen_col_batch(col_seq)
-            gt_col = np.zeros(q_len.shape, dtype=np.int64)
-            # print(ed)
-            index = 0
-            for i in range(st, ed):
-                # print(data[perm[i]]["history"])
-                gt_col[index] = data[perm[i]]["gt_col"]
-                index += 1
-            score = model.forward(q_emb_var, q_len, hs_emb_var, hs_len, col_emb_var, col_len, col_name_len, gt_col=gt_col)
-
-        elif component == "des_asc":
-            # B*0/1
-            col_seq = to_batch_tables(data, perm, st, ed, table_type)
-            col_emb_var, col_name_len, col_len = embed_layer.gen_col_batch(col_seq)
-            gt_col = np.zeros(q_len.shape, dtype=np.int64)
-            # print(ed)
-            index = 0
-            for i in range(st, ed):
-                # print(i)
-                gt_col[index] = data[perm[i]]["gt_col"]
-                index += 1
-            score = model.forward(q_emb_var, q_len, hs_emb_var, hs_len, col_emb_var, col_len, col_name_len, gt_col=gt_col)
-
-        elif component == 'having':
-            col_seq = to_batch_tables(data, perm, st, ed, table_type)
-            col_emb_var, col_name_len, col_len = embed_layer.gen_col_batch(col_seq)
-            gt_col = np.zeros(q_len.shape, dtype=np.int64)
-            # print(ed)
-            index = 0
-            for i in range(st, ed):
-                # print(i)
-                gt_col[index] = data[perm[i]]["gt_col"]
-                index += 1
-            score = model.forward(q_emb_var, q_len, hs_emb_var, hs_len, col_emb_var, col_len, col_name_len, gt_col=gt_col)
-
-        elif component == "andor":
-            score = model.forward(q_emb_var, q_len, hs_emb_var, hs_len)
         # print("label {}".format(label))
         if component in ("agg","col","keyword","op"):
             num_err, p_err, err = model.check_acc(score, label)
