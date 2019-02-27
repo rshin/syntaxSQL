@@ -1,4 +1,5 @@
 import json
+import os
 import torch
 import datetime
 import argparse
@@ -89,6 +90,7 @@ if __name__ == '__main__':
         encoder = baseline_encoder.BaselineEncoder(
             N_word, N_h, N_depth, embed_layer, should_encode_cols[args.train_component])
     elif args.query_encoder.startswith('seq2struct'):
+        N_h = 296 # = 8 * 37, largest multiple of 8 which is smalelr than 300
         spider_enc_configs = {
             'qenc=eb,ctenc=ebs,upd_steps=2': {
                 'dropout': 0.2,
@@ -177,6 +179,7 @@ if __name__ == '__main__':
     print_flag = False
     print("start training")
     best_acc = 0.0
+    save_path = "{}_models.dump".format(args.train_component)
     for i in range(args.epoch):
         print('Epoch %d @ %s'%(i+1, datetime.datetime.now()))
         print(' Loss = %s'%epoch_train(
@@ -185,4 +188,13 @@ if __name__ == '__main__':
         if acc > best_acc:
             best_acc = acc
             print("Save model...")
-            torch.save(model.state_dict(), args.save_dir+"/{}_models.dump".format(args.train_component))
+            torch.save(model.state_dict(), os.path.join(args.save_dir, save_path))
+
+        if i == 0 or (i + 1) % 10 == 0:
+            base = os.path.join(args.save_dir, "by_epoch", str(i + 1))
+            os.makedirs(base, exist_ok=True)
+            os.link(
+                os.path.join(args.save_dir, save_path),
+                os.path.join(base, save_path))
+
+
