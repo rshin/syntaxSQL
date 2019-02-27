@@ -179,7 +179,8 @@ if __name__ == '__main__':
     print_flag = False
     print("start training")
     best_acc = 0.0
-    save_path = "{}_models.dump".format(args.train_component)
+    save_name = "{}_models.dump".format(args.train_component)
+    base_save_path = os.path.join(args.save_dir, save_name)
     for i in range(args.epoch):
         print('Epoch %d @ %s'%(i+1, datetime.datetime.now()))
         print(' Loss = %s'%epoch_train(
@@ -188,13 +189,15 @@ if __name__ == '__main__':
         if acc > best_acc:
             best_acc = acc
             print("Save model...")
-            torch.save(model.state_dict(), os.path.join(args.save_dir, save_path))
+            os.rename(base_save_path, base_save_path + '.bak')
+            torch.save(model.state_dict(), base_save_path)
+            os.unlink(base_save_path + '.bak')
 
         if i == 0 or (i + 1) % 10 == 0:
-            base = os.path.join(args.save_dir, "by_epoch", str(i + 1))
-            os.makedirs(base, exist_ok=True)
+            epoch_base = os.path.join(args.save_dir, "by_epoch", str(i + 1))
+            os.makedirs(epoch_base, exist_ok=True)
             os.link(
-                os.path.join(args.save_dir, save_path),
-                os.path.join(base, save_path))
+                base_save_path,
+                os.path.join(epoch_base, save_name))
 
 
