@@ -8,7 +8,7 @@ d_type="_augment"
 # ## - aug
 hs=full
 tbl=std
-d_type=""
+#d_type=""
 
 ## - aug - table
 # hs=full
