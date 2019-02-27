@@ -196,8 +196,11 @@ if __name__ == '__main__':
         if i == 0 or (i + 1) % 10 == 0:
             epoch_base = os.path.join(args.save_dir, "by_epoch", str(i + 1))
             os.makedirs(epoch_base, exist_ok=True)
-            os.link(
-                base_save_path,
-                os.path.join(epoch_base, save_name))
+            epoch_save_name = os.path.join(epoch_base, save_name)
+            try:
+                os.unlink(epoch_save_name)
+            except:
+                pass
+            os.link(base_save_path, epoch_save_name)
 
 
