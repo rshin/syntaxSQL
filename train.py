@@ -92,6 +92,28 @@ if __name__ == '__main__':
     elif args.query_encoder.startswith('seq2struct'):
         N_h = 296 # = 8 * 37, largest multiple of 8 which is smalelr than 300
         spider_enc_configs = {
+            'qenc=eb,ctenc=ebs,upd_steps=0': {
+                'dropout': 0.2,
+                'question_encoder': ('bilstm',),
+                'column_encoder': ('bilstm-summarize',),
+                'table_encoder': ('bilstm-summarize',),
+                'update_config': {
+                    'name': 'relational_transformer',
+                    'num_layers': 0,
+                    'num_heads': 8,
+                },
+            },
+            'qenc=eb,ctenc=ebs,upd_steps=1': {
+                'dropout': 0.2,
+                'question_encoder': ('bilstm',),
+                'column_encoder': ('bilstm-summarize',),
+                'table_encoder': ('bilstm-summarize',),
+                'update_config': {
+                    'name': 'relational_transformer',
+                    'num_layers': 1,
+                    'num_heads': 8,
+                },
+            },
             'qenc=eb,ctenc=ebs,upd_steps=2': {
                 'dropout': 0.2,
                 'question_encoder': ('bilstm',),
