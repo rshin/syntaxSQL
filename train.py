@@ -98,9 +98,7 @@ if __name__ == '__main__':
                 'column_encoder': ('bilstm-summarize',),
                 'table_encoder': ('bilstm-summarize',),
                 'update_config': {
-                    'name': 'relational_transformer',
-                    'num_layers': 0,
-                    'num_heads': 8,
+                    'name': 'none',
                 },
             },
             'qenc=eb,ctenc=ebs,upd_steps=1': {
@@ -211,9 +209,15 @@ if __name__ == '__main__':
         if acc > best_acc:
             best_acc = acc
             print("Save model...")
-            os.rename(base_save_path, base_save_path + '.bak')
+            try:
+                os.rename(base_save_path, base_save_path + '.bak')
+            except FileNotFoundError:
+                pass
             torch.save(model.state_dict(), base_save_path)
-            os.unlink(base_save_path + '.bak')
+            try:
+                os.unlink(base_save_path + '.bak')
+            except FileNotFoundError:
+                pass
 
         if i == 0 or (i + 1) % 10 == 0:
             epoch_base = os.path.join(args.save_dir, "by_epoch", str(i + 1))
