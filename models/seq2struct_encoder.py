@@ -33,21 +33,6 @@ class Seq2structEncoder(nn.Module):
         self.zero_emb = np.zeros(self.N_word, dtype=np.float32)
         self.gpu = gpu
 
-        self.spider_enc = spider_enc.SpiderEncoderV2(
-            device=torch.device('cuda') if gpu else torch.device('cpu'),
-            preproc=FakePreproc,
-            word_emb_size=N_word,
-            recurrent_size=N_h,
-            dropout=0.2,
-            question_encoder=('bilstm',),
-            column_encoder=('bilstm-summarize',),
-            table_encoder=('bilstm-summarize',),
-            update_config={
-                'name': 'relational_transformer',
-                'num_layers': 2,
-                'num_heads': 8,
-            }
-        )
         self.spider_enc = registry.instantiate(
             spider_enc.SpiderEncoderV2,
             spider_enc_config,
